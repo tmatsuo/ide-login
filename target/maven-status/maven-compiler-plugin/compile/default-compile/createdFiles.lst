@@ -1,7 +1,0 @@
-com/google/gdt/eclipse/login/common/UiFacade.class
-com/google/gdt/eclipse/login/common/VerificationCodeHolder.class
-com/google/gdt/eclipse/login/common/OAuthData.class
-com/google/gdt/eclipse/login/common/LoginListener.class
-com/google/gdt/eclipse/login/common/LoggerFacade.class
-com/google/gdt/eclipse/login/common/GoogleLoginState.class
-com/google/gdt/eclipse/login/common/OAuthDataStore.class
