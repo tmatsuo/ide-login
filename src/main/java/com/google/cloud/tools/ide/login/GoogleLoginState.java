@@ -12,7 +12,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  *******************************************************************************/
-package com.google.gdt.eclipse.login.common;
+package com.google.cloud.tools.ide.login;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeRequestUrl;
