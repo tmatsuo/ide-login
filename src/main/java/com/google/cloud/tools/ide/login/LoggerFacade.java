@@ -12,32 +12,26 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  *******************************************************************************/
-package com.google.gdt.eclipse.login.common;
+package com.google.cloud.tools.ide.login;
 
 /**
- * Presents a common API, implementable on a variety of platforms, for storing a particular user's
- * {@link OAuthData} object persistently, retrieving it, and clearing it.
+ * Presents a common API, implementable on a variety of platforms, for making log entries.
  */
-public interface OAuthDataStore {
-  
+public interface LoggerFacade {
+
   /**
-   * Stores a specified {@link OAuthData} object persistently.
+   * Create an error log entry with a specified message and a specified {@link Throwable}.
    * 
-   * @param credentials the specified {@code Credentials object}
+   * @param message the specified message
+   * @param t the specified {@code Throwable}
    */
-  void saveOAuthData(OAuthData credentials);
-  
+  void logError(String message, Throwable t);
+
   /**
-   * Retrieves the persistently stored {@link OAuthData} object, if any.
+   * Create a warning log entry with a specified message.
    * 
-   * @return
-   *     if there is a persistently stored {@code OAuthData} object, that object; otherwise an
-   *     {@code OAuthData} object all of whose getters return {@code null}
+   * @param message the specified message
    */
-  OAuthData loadOAuthData();
-  
-  /**
-   * Clears the persistently stored {@link OAuthData} object, if any.
-   */
-  void clearStoredOAuthData();
+  void logWarning(String message);
+
 }

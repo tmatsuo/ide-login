@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2011 Google Inc. All Rights Reserved.
+ * Copyright 2014 Google Inc. All Rights Reserved.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -12,16 +12,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
-package com.google.gdt.eclipse.login.common;
+package com.google.cloud.tools.ide.login;
 
 /**
- * Listener for the login status change of the user.
+ * Holder for a Google OAuth verification code and the redirect URL used to create it.
  */
-public interface LoginListener {
+public class VerificationCodeHolder {
+  private final String verificationCode;
+  private final String redirectUrl;
 
-  /**
-   * Called when the login status of the user changes.
-   * @param login true if the user has logged in, false if the user has logged out.
-   */
-  void statusChanged(boolean login);
+  public VerificationCodeHolder(String verificationCode, String redirectUrl) {
+    this.verificationCode = verificationCode;
+    this.redirectUrl = redirectUrl;
+  }
+
+  public String getRedirectUrl() {
+    return redirectUrl;
+  }
+
+  public String getVerificationCode() {
+    return verificationCode;
+  }
 }
