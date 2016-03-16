@@ -2,3 +2,6 @@
 bin/
 proxy_bin/
 target/
+.classpath
+.project
+.settings/
