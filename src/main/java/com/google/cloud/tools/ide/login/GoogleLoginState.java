@@ -39,7 +39,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
-import java.util.SortedSet;
+import java.util.Set;
 
 import javax.annotation.Nullable;
 
@@ -62,7 +62,7 @@ public class GoogleLoginState {
 
   private String clientId;
   private String clientSecret;
-  private SortedSet<String> oAuthScopes;
+  private Set<String> oAuthScopes;
   private OAuthDataStore authDataStore;
   private UiFacade uiFacade;
   private LoggerFacade loggerFacade;
@@ -83,14 +83,14 @@ public class GoogleLoginState {
    *
    * @param clientId the client ID for the specified client application
    * @param clientSecret the client secret for the specified client application
-   * @param oAuthScopes the specified authorization scopes
+   * @param oAuthScopes the authorization scopes
    * @param authDataStore
    *     a platform-specific implementation of the {@link OAuthDataStore} interface
    * @param uiFacade a platform-specific implementation of the {@link UiFacade} interface
    * @param loggerFacade a platform-specific implementation of the {@link LoggerFacade} interface
    */
   public GoogleLoginState(
-      String clientId, String clientSecret, SortedSet<String> oAuthScopes,
+      String clientId, String clientSecret, Set<String> oAuthScopes,
       OAuthDataStore authDataStore, UiFacade uiFacade, LoggerFacade loggerFacade) {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
@@ -147,7 +147,6 @@ public class GoogleLoginState {
    * @return an OAuth2 token, or null if there was an error or if the user
    *         wasn't signed in and canceled signing in.
    * @throws IOException if something goes wrong while fetching the token.
-   *
    */
   public String fetchAccessToken() throws IOException {
     if (!checkLoggedIn(null)) {
@@ -470,10 +469,9 @@ public class GoogleLoginState {
     oAuth2Credential = makeCredential();
   }
 
-  private boolean checkLoggedIn(String msg) {
+  private boolean checkLoggedIn(String message) {
     if (!isLoggedIn) {
-      boolean rc = logIn(msg);
-      if (!rc) {
+      if (!logIn(message)) {
         return false;
       }
       uiFacade.notifyStatusIndicator();
