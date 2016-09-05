@@ -1,17 +1,19 @@
-/*******************************************************************************
- * Copyright 2011, 2014 Google Inc. All Rights Reserved.
+/*
+ * Copyright 2016 Google Inc. All Rights Reserved.
  *
- * All rights reserved. This program and the accompanying materials are made
- * available under the terms of the Eclipse Public License v1.0 which
- * accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- *******************************************************************************/
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.google.cloud.tools.ide.login;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -29,13 +31,13 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson.JacksonFactory;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Collection;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -73,9 +75,8 @@ public class GoogleLoginState {
   private String refreshToken;
   private boolean isLoggedIn;
   private String email;
-  private boolean connected; // whether we connected to the internet
 
-  private Collection<LoginListener> listeners;
+  private final Collection<LoginListener> listeners;
 
   /**
    * Construct a new platform-specific {@code GoogleLoginState} for a specified client application
@@ -101,7 +102,6 @@ public class GoogleLoginState {
 
     this.isLoggedIn = false;
     this.email = "";
-    connected = true; // assume we're connected until checkCredentials is called
 
     listeners = Lists.newLinkedList();
     retrieveSavedCredentials();
@@ -120,23 +120,18 @@ public class GoogleLoginState {
 
   /**
    * Returns an HttpRequestFactory object that has been signed with the users's
-   * authentication headers to use to make http requests. If the user has not
-   * signed in, this method will block and pop up the login dialog to the user.
-   * If the user cancels signing in, this method will return null.
+   * authentication headers to use to make http requests.
    *
    * <p>If the access token that was used to sign this transport was revoked or
    * has expired, then execute() invoked on Request objects constructed from
    * this transport will throw an exception, for example,
    * "com.google.api.client.http.HttpResponseException: 401 Unauthorized"
    *
-   * @param message The message to display in the login dialog if the user needs
-   *          to log in to complete this action. If null, then no message area
-   *          is created. See {@link #logIn(String)}
+   * @throws IllegalStateException if no user is currently signed in
    */
-  public HttpRequestFactory createRequestFactory(@Nullable String message) {
-    if (!checkLoggedIn(message)) {
-      return null;
-    }
+  public HttpRequestFactory createRequestFactory() {
+    Preconditions.checkState(isLoggedIn);
+
     return transport.createRequestFactory(oAuth2Credential);
   }
 
@@ -144,21 +139,20 @@ public class GoogleLoginState {
    * Makes a request to get an OAuth2 access token from the OAuth2 refresh token
    * if it is expired.
    *
-   * @return an OAuth2 token, or null if there was an error or if the user
-   *         wasn't signed in and canceled signing in.
-   * @throws IOException if something goes wrong while fetching the token.
+   * @return an OAuth2 token
+   * @throws IllegalStateException if no user is currently signed in
+   * @throws IOException if something goes wrong while fetching the token
    */
   public String fetchAccessToken() throws IOException {
-    if (!checkLoggedIn(null)) {
-      return null;
+    Preconditions.checkState(isLoggedIn);
+
+    if (accessTokenExpiryTime == 0) {
+      return fetchOAuth2Token();
     }
-    if (accessTokenExpiryTime != 0) {
-      long currentTime = new GregorianCalendar().getTimeInMillis() / 1000;
-      if (currentTime >= accessTokenExpiryTime) {
-        fetchOAuth2Token();
-      }
-    } else {
-      fetchOAuth2Token();
+
+    long currentTime = System.currentTimeMillis() / 1000;
+    if (currentTime >= accessTokenExpiryTime) {
+      return fetchOAuth2Token();
     }
     return accessToken;
   }
@@ -172,15 +166,13 @@ public class GoogleLoginState {
   }
 
   /**
-   * Returns the OAuth2 refresh token, logging in to obtain it if necessary. If the user has not
-   * signed in, this method blocks and prompts the user to log in.
+   * Returns the OAuth2 refresh token.
    *
-   * @return the refresh token, or {@code null} if the user cancels out of a request to log in
+   * @throws IllegalStateException if no user is currently signed in
    */
   public String fetchOAuth2RefreshToken() {
-    if (!checkLoggedIn(null)) {
-      return null;
-    }
+    Preconditions.checkState(isLoggedIn);
+
     return refreshToken;
   }
 
@@ -188,15 +180,13 @@ public class GoogleLoginState {
    * Makes a request to get an OAuth2 access token from the OAuth2 refresh
    * token. This token is short lived.
    *
-   * @return an OAuth2 token, or null if there was an error or if the user
-   *         wasn't signed in and canceled signing in.
-   * @throws IOException if something goes wrong while fetching the token.
+   * @return an OAuth2 token
+   * @throws IllegalStateException if no user is currently signed in
+   * @throws IOException if something goes wrong while fetching the token
    *
    */
   public String fetchOAuth2Token() throws IOException {
-    if (!checkLoggedIn(null)) {
-      return null;
-    }
+    Preconditions.checkState(isLoggedIn);
 
     try {
       GoogleRefreshTokenRequest request = new GoogleRefreshTokenRequest(
@@ -204,13 +194,13 @@ public class GoogleLoginState {
       GoogleTokenResponse authResponse = request.execute();
       accessToken = authResponse.getAccessToken();
       oAuth2Credential.setAccessToken(accessToken);
-      accessTokenExpiryTime = new GregorianCalendar().getTimeInMillis() / 1000
-          + authResponse.getExpiresInSeconds().longValue();
-    } catch (IOException e) {
-      loggerFacade.logError("Could not obtain an OAuth2 access token.", e);
-      throw e;
+      accessTokenExpiryTime = System.currentTimeMillis() / 1000
+          + authResponse.getExpiresInSeconds();
+    } catch (IOException ex) {
+      loggerFacade.logError("Could not obtain an OAuth2 access token.", ex);
+      throw ex;
     }
-    saveCredentials();
+    persistCredentials();
     return accessToken;
   }
 
@@ -227,15 +217,6 @@ public class GoogleLoginState {
    */
   public String getEmail() {
     return email;
-  }
-
-  /**
-   * Returns true if the plugin was able to connect to the internet to try to ,
-   * true if there were no stored credentials, and false if there were stored
-   * credentials, but it could not connect to verify.
-   */
-  public boolean isConnected() {
-    return connected;
   }
 
   /**
@@ -264,19 +245,15 @@ public class GoogleLoginState {
    * @return true if the user signed in or is already signed in, false otherwise
    */
   public boolean logIn(@Nullable String title) {
-
     if (isLoggedIn) {
       return true;
     }
 
     GoogleAuthorizationCodeRequestUrl requestUrl =
-        new GoogleAuthorizationCodeRequestUrl(
-            clientId, OAUTH2_NATIVE_CALLBACK_URL, oAuthScopes);
+        new GoogleAuthorizationCodeRequestUrl(clientId, OAUTH2_NATIVE_CALLBACK_URL, oAuthScopes);
 
-    connected = true;
     String verificationCode =
         uiFacade.obtainVerificationCodeFromUserInteraction(title, requestUrl);
-
     if (verificationCode == null) {
       return false;
     }
@@ -292,17 +269,17 @@ public class GoogleLoginState {
     GoogleTokenResponse authResponse;
     try {
       authResponse = authRequest.execute();
-    } catch (IOException e) {
+    } catch (IOException ex) {
       uiFacade.showErrorDialog(
           "Error while signing in",
-          "An error occured while trying to sign in: " + e.getMessage()
+          "An error occured while trying to sign in: " + ex.getMessage()
               + ". See the error log for more details.");
       loggerFacade.logError(
-          "Could not sign in. Make sure that you entered the correct verification code.", e);
+          "Could not sign in. Make sure that you entered the correct verification code.", ex);
       return false;
     }
     isLoggedIn = true;
-    updateUserCredentials(authResponse);
+    updateLoginState(authResponse);
     return true;
   }
 
@@ -323,16 +300,13 @@ public class GoogleLoginState {
    * @return true if the user signed in or is already signed in, false otherwise
    */
   public boolean logInWithLocalServer(@Nullable String title) {
-
     if (isLoggedIn) {
       return true;
     }
 
-    connected = true;
-    VerificationCodeHolder verificationCodeHolder =
+    VerificationCodeHolder codeHolder =
         uiFacade.obtainVerificationCodeFromExternalUserInteraction(title);
-
-    if (verificationCodeHolder == null) {
+    if (codeHolder == null) {
       return false;
     }
 
@@ -342,20 +316,20 @@ public class GoogleLoginState {
             jsonFactory,
             clientId,
             clientSecret,
-            verificationCodeHolder.getVerificationCode(),
-            verificationCodeHolder.getRedirectUrl());
+            codeHolder.getVerificationCode(),
+            codeHolder.getRedirectUrl());
     GoogleTokenResponse authResponse;
     try {
       authResponse = authRequest.execute();
-    } catch (IOException e) {
+    } catch (IOException ex) {
       uiFacade.showErrorDialog(
           "Error while signing in",
-          "An error occured while trying to sign in: " + e.getMessage());
-      loggerFacade.logError("Could not sign in", e);
+          "An error occured while trying to sign in: " + ex.getMessage());
+      loggerFacade.logError("Could not sign in", ex);
       return false;
     }
     isLoggedIn = true;
-    updateUserCredentials(authResponse);
+    updateLoginState(authResponse);
     return true;
   }
 
@@ -382,22 +356,20 @@ public class GoogleLoginState {
       return true;
     }
 
-    boolean logOut = true;
     if (showPrompt) {
-      logOut = uiFacade.askYesOrNo("Sign out?", "Are you sure you want to sign out?");
+      if (!uiFacade.askYesOrNo("Sign out?", "Are you sure you want to sign out?")) {
+        return false;
+      }
     }
 
-    if (logOut) {
-      email = "";
-      isLoggedIn = false;
+    email = "";
+    isLoggedIn = false;
 
-      authDataStore.clearStoredOAuthData();
+    authDataStore.clearStoredOAuthData();
 
-      notifyLoginStatusChange(false);
-      uiFacade.notifyStatusIndicator();
-      return true;
-    }
-    return false;
+    notifyLoginStatusChange(false);
+    uiFacade.notifyStatusIndicator();
+    return true;
   }
 
   public Credential makeCredential() {
@@ -428,26 +400,31 @@ public class GoogleLoginState {
     uiFacade.notifyStatusIndicator();
   }
 
-  private void updateUserCredentials(GoogleTokenResponse tokenResponse) {
+  private void updateLoginState(GoogleTokenResponse tokenResponse) {
     refreshToken = tokenResponse.getRefreshToken();
     accessToken = tokenResponse.getAccessToken();
     oAuth2Credential = makeCredential();
-    accessTokenExpiryTime = System.currentTimeMillis() / 1000
-        + tokenResponse.getExpiresInSeconds().longValue();
+    accessTokenExpiryTime = System.currentTimeMillis() / 1000 + tokenResponse.getExpiresInSeconds();
     email = queryEmail();
-    saveCredentials();
+    persistCredentials();
     uiFacade.notifyStatusIndicator();
     notifyLoginStatusChange(true);
   }
 
   private void retrieveSavedCredentials() {
+    Preconditions.checkState(!isLoggedIn(), "Should be called only once in the constructor.");
 
     OAuthData savedAuthState = authDataStore.loadOAuthData();
 
-    // the stored email can be null in the case where the external browser
-    // was launched, because we can't extract the email from the external
-    // browser
     if (savedAuthState.getRefreshToken() == null || savedAuthState.getStoredScopes().isEmpty()) {
+      authDataStore.clearStoredOAuthData();
+      return;
+    }
+
+    if (!oAuthScopes.equals(savedAuthState.getStoredScopes())) {
+      loggerFacade.logWarning(
+          "OAuth scope set for stored credentials no longer valid, logging out.");
+      loggerFacade.logWarning(oAuthScopes + " vs. " + savedAuthState.getStoredScopes());
       authDataStore.clearStoredOAuthData();
       return;
     }
@@ -455,77 +432,43 @@ public class GoogleLoginState {
     accessToken = savedAuthState.getAccessToken();
     refreshToken = savedAuthState.getRefreshToken();
     accessTokenExpiryTime = savedAuthState.getAccessTokenExpiryTime();
-    this.email = savedAuthState.getStoredEmail();
+    email = savedAuthState.getStoredEmail();
+    oAuth2Credential = makeCredential();
 
     isLoggedIn = true;
-
-    if (!oAuthScopes.equals(savedAuthState.getStoredScopes())) {
-      loggerFacade.logWarning(
-          "OAuth scope set for stored credentials no longer valid, logging out.");
-      loggerFacade.logWarning(oAuthScopes + " vs. " + savedAuthState.getStoredScopes());
-      logOut(false);
-    }
-
-    oAuth2Credential = makeCredential();
-  }
-
-  private boolean checkLoggedIn(String message) {
-    if (!isLoggedIn) {
-      if (!logIn(message)) {
-        return false;
-      }
-      uiFacade.notifyStatusIndicator();
-    }
-    return true;
   }
 
   private void notifyLoginStatusChange(boolean login) {
     synchronized(listeners) {
       for (LoginListener listener : listeners) {
-        try {
-          listener.statusChanged(login);
-        } catch (Throwable t) {
-          loggerFacade.logError("Exception in LoginListener", t);
-        }
+        listener.statusChanged(login);
       }
     }
   }
 
   private String queryEmail() {
-    String url = GET_EMAIL_URL;
-
-    HttpResponse resp = null;
     try {
-      HttpRequest get = createRequestFactory(null).buildGetRequest(new GenericUrl(url));
-      resp = get.execute();
-      // TODO(nhcohen): Upgrade to Java 7 after moving to separate project:
-      /*try (Scanner scan = new Scanner(resp.getContent())) {
-        String respStr = "";
+      HttpRequest get = createRequestFactory().buildGetRequest(new GenericUrl(GET_EMAIL_URL));
+      HttpResponse resp = get.execute();
+
+      String responseString = "";
+      try (Scanner scan = new Scanner(resp.getContent())) {
         while (scan.hasNext()) {
-          respStr += scan.nextLine();
+          responseString += scan.nextLine();
         }
-      }*/
-      Scanner scan = new Scanner(resp.getContent());
-      String respStr = "";
-      while (scan.hasNext()) {
-        respStr += scan.nextLine();
       }
-      scan.close();
 
-      Map<String, String> params = GoogleLoginState.parseUrlParameters(respStr);
-      String userEmail = params.get("email");
+      String userEmail = parseUrlParameters(responseString).get("email");
       if (userEmail == null) {
-        throw new Exception("Response from server is invalid.");
+        loggerFacade.logWarning("Could not parse email after Google service sign-in");
       }
-
       return userEmail;
 
-    } catch (Exception e) {
+    } catch (IOException ioe) {
       // catch exception in case something goes wrong in parsing the response
-      loggerFacade.logError("Could not parse email after Google service sign-in", e);
+      loggerFacade.logError("Could not parse email after Google service sign-in", ioe);
+      return null;
     }
-
-    return null;
   }
 
   /**
@@ -540,32 +483,28 @@ public class GoogleLoginState {
    */
   private static Map<String, String> parseUrlParameters(String params)
       throws UnsupportedEncodingException {
-    Map<String, String> paramMap = new HashMap<String, String>();
+    Map<String, String> paramMap = new HashMap<>();
 
-    int qMark = params.indexOf('?');
-    if (qMark > -1) {
-      params = params.substring(qMark + 1);
+    int questionMark = params.indexOf('?');
+    if (questionMark > -1) {
+      params = params.substring(questionMark + 1);
     }
 
-    String[] paramArr = params.split("&");
-    for (String s : paramArr) {
-      String[] keyVal = s.split("=");
+    String[] paramArray = params.split("&");
+    for (String param : paramArray) {
+      String[] keyVal = param.split("=");
       if (keyVal.length == 2) {
-        paramMap.put(URLDecoder.decode(keyVal[0], "UTF-8"), URLDecoder.decode(
-            keyVal[1], "UTF-8"));
+        paramMap.put(URLDecoder.decode(keyVal[0], "UTF-8"), URLDecoder.decode(keyVal[1], "UTF-8"));
       }
     }
     return paramMap;
   }
 
-  private void saveCredentials() {
-    if (!isLoggedIn) {
-      authDataStore.clearStoredOAuthData();
-    } else {
-      OAuthData creds =
-          new OAuthData(
-              accessToken, refreshToken, email, oAuthScopes, accessTokenExpiryTime);
-      authDataStore.saveOAuthData(creds);
-    }
+  private void persistCredentials() {
+    Preconditions.checkState(isLoggedIn);
+
+    OAuthData creds = new OAuthData(
+        accessToken, refreshToken, email, oAuthScopes, accessTokenExpiryTime);
+    authDataStore.saveOAuthData(creds);
   }
 }
